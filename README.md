@@ -48,7 +48,7 @@ Participants can open this file in **RStudio** and run the code sections sequent
 
 ## Code Files (Python)
 
-Python users will follow a pre-designed workshop [Programming Historian](https://programminghistorian.org/en/lessons/understanding-creating-word-embeddings#corpus-size). 
+Python users will follow the pre-designed workshop: [Programming Historian](https://programminghistorian.org/en/lessons/understanding-creating-word-embeddings#corpus-size). 
 You can directly follow the workshop using the link. However, it is important to note that this tutorial has some important setup requisites for working locally on your PC and depending on your experience with Python this could become a hassle. 
 Therefore for those who would like to follow the tutorial using the University [Noteable](https://noteable.edina.ac.uk/launch) cloud service, we have added core materials from the tutorial to this repository so it can be cloned with a file structure and important installs pre-embedded.
 
