@@ -90,7 +90,7 @@ Instead of training a model during the session, participants will load this file
 The tutorial also includes the training code so that participants can see how such models are normally created.
 
 ---
-# Getting Started in Python
+# Getting Started in Python (for R, please scroll down)
 
 ### Setting up for the word embedding tutorial in python
 
