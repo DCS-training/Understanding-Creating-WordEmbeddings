@@ -5,11 +5,6 @@ The tutorial introduces the basic concepts behind **word embeddings** and demons
 
 The workshop is available in **both Python and R**:
 
-* If you would like to follow the **Python version**, please navigate to:
-  **[[Programming Historian](https://programminghistorian.org/en/lessons/understanding-creating-word-embeddings)]**
-
-* If you would like to follow the **R version**, the materials are provided in this repository and described below.
-
 The goal of this workshop is to introduce how word embeddings represent relationships between words in a corpus and how these representations can be explored to investigate patterns in language use.
 
 Participants will work through a step-by-step workflow that includes:
@@ -39,19 +34,28 @@ By the end of this workshop, participants should be able to:
 
 # Workshop Files
 
-## Code Files
+## Code Files (R)
 
-The repository contains the **R tutorial** for the workshop:
+This RMarkdown file below contains the full tutorial, including theoretical explanations and executable code.
 
 ```
 word_embeddings.Rmd
 ```
 
-This RMarkdown file contains the full tutorial, including theoretical explanations and executable code.
-
-Participants can open this file in **RStudio** and run the code sections sequentially.
+Participants can open this file in **RStudio** and run the code sections sequentially. Alternatively, they can use Noteable (please see below for further details)
 
 ---
+
+## Code Files (Python)
+
+Python users will follow a pre-designed workshop [Programming Historian](https://programminghistorian.org/en/lessons/understanding-creating-word-embeddings#corpus-size). 
+You can directly follow the workshop using the link. However, it is important to note that this tutorial has some important setup requisites for working locally on your PC and depending on your experience with Python this could become a hassle. 
+Therefore for those who would like to follow the tutorial using the University [Noteable](https://noteable.edina.ac.uk/launch) cloud service, we have added core materials from the tutorial to this repository so it can be cloned with a file structure and important installs pre-embedded.
+
+The code file below contains the full tutorial in Python:
+```
+understanding-creating-word-embeddings.ipynb
+```
 
 ## Data Files
 
@@ -86,6 +90,10 @@ Instead of training a model during the session, participants will load this file
 The tutorial also includes the training code so that participants can see how such models are normally created.
 
 ---
+# Getting Started in Python
+
+To follow the Noteable setup procedure for Python, please click [HERE](https://github.com/DCS-training/Understanding-Creating-WordEmbeddings/blob/main/SetupGuide_Python_Details_README.md)
+
 
 # Getting Started in R
 
@@ -183,8 +191,3 @@ The repository is organised as follows:
 
 ---
 
-# Getting started with Python with simpler setup procedures
-
-The linked [Programming Historian](https://programminghistorian.org/en/lessons/understanding-creating-word-embeddings#corpus-size) tutorial has some important setup requisites for working locally on your PC. Depending on your experience with Python this could become a hassle, therefore for those who would like to follow the tutorial using the University [Noteable](https://noteable.edina.ac.uk/launch) cloud service, we have added core materials from the tutorial to this repository so it can be cloned with a file structure and important installs pre-embedded.
-
-To follow the Noteable setup procedure please click [HERE](https://github.com/DCS-training/Understanding-Creating-WordEmbeddings/blob/main/SetupGuide_Python_Details_README.md)
