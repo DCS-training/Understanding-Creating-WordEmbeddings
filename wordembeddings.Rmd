@@ -1,0 +1,694 @@
+---
+title: "Understanding and Creating Word Embeddings in R"
+author: "Aybuke Atalay"
+date: "2026-03-09"
+output: html_document
+---
+
+# Introduction
+
+This workshop introduces the basic concepts behind **word embeddings** and demonstrates how to explore them using R.
+
+This material is adapted from the Programming Historian lesson *Understanding and Creating Word Embeddings*, which presents the workflow using Python. The aim of this version is to reproduce the same concepts and analytical steps using the R programming language.
+
+Word embeddings allow researchers to analyse the usage of different terms in a corpus by capturing information about how words are used in context. Words that appear in similar contexts are represented as vectors that are close to each other in a multi-dimensional space. By analysing the relationships between these vectors, we can explore patterns of language usage across a corpus.
+
+This lesson introduces how a corpus is prepared, how word embedding models are trained, and how the resulting vectors can be explored to answer research questions.
+
+The original lesson trains a model using Python. In this workshop we include the training code for reference, but we will instead work with a **pre-trained model** so that the analysis can run quickly on your local computer.
+
+By the end of this lesson you will understand:
+
+-   what word embeddings and word vectors are\
+-   how words are represented in vector space\
+-   how to explore relationships between words using embeddings\
+-   what kinds of research questions embeddings can help answer
+
+------------------------------------------------------------------------
+
+# System Requirements
+
+This tutorial assumes that you have R installed on your computer and that you are able to run R code using RStudio or another IDE.
+
+We will use a small number of R packages: (if any of these packages are already installed, you can skip the install.packages() step)
+
+```{r}
+install.packages("tidyverse")
+install.packages("text2vec")
+install.packages("tokenizers")
+install.packages("readr")
+install.packages("purrr")
+install.packages("stringr")
+```
+
+We will load the packages (necessary for each run)
+
+```{r}
+library(tidyverse)
+library(text2vec)
+library(tokenizers)
+library(readr)
+library(purrr)
+library(stringr)
+```
+
+# Corpus Size
+
+Word embeddings require a lot of text in order to reasonably represent these relationships — you won’t get meaningful output if you use only a couple novels, or a handful of historical documents. The algorithm learns to predict the contexts in which words might appear based on the corpus it is trained on, so fewer words in the training corpus means less information from which to learn.
+
+That said, there is no absolute minimum number of words required to train a word embedding model. Performance will vary depending on how the model is trained, what kinds of documents you are using, how many unique words appear in the corpus, and a variety of other factors. Although smaller corpora can produce more unstable vectors,3 a smaller corpus may make more sense for the kinds of questions you’re interested in. If your purposes are exploratory, even a model trained on a fairly small corpus should still produce interesting results. However, if you find that the model doesn’t seem to make sense, that might mean you need to add more texts to your input corpus, or adjust your settings for training the model.
+
+# Theory: Introducing Concepts
+
+## Word Embeddings
+
+When was the astronomical concept of orbital revolution supplanted by that of political uprising? How do popular methods for cooking chicken change over time? How do associations of words like grace or love vary between prayers and romance novels? Humanistic inquiries such as these that can prove to be challenging to answer through traditional methods like close reading.
+
+However, by using word embeddings, we can quickly identify relationships between words and begin to answer these types of questions. Word embeddings assign numerical values to words in a text based on their relation to other words. These numerical representations, or ‘word vectors’, allow us to measure the distance between words and gain insight into how they are used in similar ways or contexts. Scaled up to a whole corpus, word embeddings can uncover relationships between words or concepts across an entire time period, genre of writing, or author’s collected works.
+
+Unlike topic models, which rely on word frequency to better understand the general topic of a document, word embeddings are more concerned with how words are used across a whole corpus. This emphasis on relationships and contextual usage make word embeddings uniquely equipped to tackle many questions that humanists may have about a particular corpus of texts. For example, you can ask your word embedding model to identify the list of top ten words that are used in similar contexts as the word grace. You can also ask your model to produce that same list, this time removing the concept holy. You can even ask your model to show you the words in your corpus most similar to the combined concept of grace and holy. The ability to perform basic math with concepts (though much more complicated math is happening under the hood) in order to ask really complicated questions about a corpus is one of the key benefits of using word embeddings for textual analysis.
+
+## Word Vectors
+
+Word embedding models represent words through a series of numbers referred to as a ‘word vector’. A word vector represents the positioning of a word in multi-dimensional space. Just like we could perform basic math on objects that we’ve mapped onto two-dimensional space (e.g. visualizations with an X and Y axis), we can perform slightly more complicated math on words mapped onto multi-dimensional space.
+
+A ‘vector’ is a point in space that has both ‘magnitude’ (or ‘length’) and ‘direction.’ This means that vectors are less like isolated points, and more like lines that trace a path from an origin point to that vector’s designated position, in what is called a ‘vector space.’ Models created with word vectors, called ‘word embedding models,’ use word vectors to capture the relationships between words based on how close words are to one another in the vector space.
+
+This may sound complicated and abstract, but let’s start with a kind of word vector that is more straightforward: a document-term matrix.
+
+## Document-Term Matrices
+
+One way of representing a corpus of texts is a ‘document-term matrix’: a large table in which each row represents a word, and each column represents a text in the corpus. The cells are filled with the count of that particular word in that specific text. If you include every single word in every single text as part of this matrix (including things like names, typos, and obscure words), you’ll have a table where most of the cells have a value of 0, because most of the words just don’t occur in most of the texts. This setup is called a ‘sparse vector representation.’ The matrix also becomes harder to work with as the number of words increases, filling the matrix with more and more 0s. This becomes problematic, because you need a large number of words to have enough data to meaningfully represent language.
+
+The innovation of algorithms like word2vec is that they represent relationships between words in a ‘dense’ way. Different algorithms take different approaches, with consequences on the model’s output, but all use a process called ‘embedding’ to make the vector smaller and much faster. Instead of a vector with tens of thousands of dimensions (including information about the relationship of every unique word with every other unique word), these word embedding models typically use only a few hundred abstracted dimensions, which nonetheless manage to capture the most essential information about relations between different groups of words.
+
+## word2vec
+
+*word2vec* was the first algorithm invented for creating word embedding models, and it remains one of the most popular. It is a predictive model, meaning that it works out the likelihood that either:
+
+1)  a word will occur in a particular context (using the Continuous Bag of Words (CBOW) method), or\
+2)  the likelihood that a particular context will occur for a given word (using the skip-gram method).
+
+For this introduction, you don’t need to worry about the differences between these methods. If you would like to learn more about how word embedding models are trained, there are many useful resources online, such as the “Illustrated Word2vec” guide by Jay Alammar. The two methods tend to perform equally well, but skip-gram often works better with smaller datasets and has better success representing less common words; by contrast, CBOW tends to perform better at representing more common words.
+
+For instance, take this set of phrases with the word *milk* in the middle:
+
+- Pour the milk into the
+- Add 1c milk slowly while
+- Set the milk aside to
+- Bring the milk to a
+
+word2vec samples a variety of contexts around each word throughout the corpus, but also collects examples of contexts that never occur around each word, known as ‘negative sampling.’ Negative sampling might generate examples like:
+
+-   Colorless green milk sleeps furiously
+-   My horrible milk ate my
+-   The idealistic milk meowed all
+
+It then takes this data and uses it to train a model that can predict the words that are likely, or unlikely, to appear around the word milk. Because the sampling is random, you will likely end up with a small amount of variation in your results if you run word2vec on a corpus multiple times.
+
+If you find that running word2vec multiple times gets you a large amount of variation, your corpus may be too small to meaningfully use word vectors. The model learns a set of ‘weights’ (probabilities) which are constantly adjusted as the network is trained, in order to make the network more accurate in its predictions. At the end of training, the values of those weights become the dimensions of the word vectors which form the embedding model.
+
+word2vec works particularly well for identifying synonyms, or words that could be substituted in a particular context. In this sense, juice will probably end up being closer to milk than cow, because it’s more feasible to substitute juice than cow in a phrase like “Pour the [WORD] into the”.
+
+## Distance in Vector Space
+
+Recall that vectors have both a direction (where is it going?) and a length (how far does it go in that direction?). Both their direction and length reflect word associations in the corpus. If two vectors are going in the same direction, and have a similar length, that means that they are very close to each other in vector space, and they have a similar set of word associations.
+
+‘Cosine similarity’ is a common method of measuring ‘closeness’ between words. When you are comparing two vectors from the same corpus, you are comparing two lines that share an origin point. In order to figure out how similar those words are, all we need to do is to connect their designated position in vector space with an additional line, forming a triangle. The distance between the two vectors can then be calculated using the cosine of this new line.
+
+The larger this number, the closer those two vectors are in vector space. For example, two words that are far from each other (say, email and yeoman) might have a low cosine similarity of around 0.1, while two words that are near to each other (say happy and joyful or even happy and sad) might have a higher cosine similarity of around 0.8.
+
+Words that are close in vector space are those that the model predicts are likely to be used in similar contexts. It is often tempting to think of these as synonyms, but that’s not always the case. In fact, antonyms are often very close to each other in word2vec vector space.
+
+When you observe that words are close to each other in your models (high cosine similarity), you should return to your corpus to get a better understanding of how the use of language might be reinforcing this proximity.
+
+## Vector Math
+
+Because word vectors represent natural language numerically, it becomes possible to perform mathematical equations with them.
+
+Let’s say for example that you wanted to ask your corpus the following question:
+
+“How do people in nineteenth-century novels use the word bread when they aren’t referring to food?”
+
+Using vector math allows us to present this very specific query to our model.
+
+The equation you might use to ask your corpus that exact question might be: bread - food = x
+
+To be even more precise, what if you wanted to ask:
+
+“How do people talk about bread in kitchens when they aren’t referring to food?”
+
+That equation may look like: read + kitchen - food = x
+
+The more complex the math, the larger the corpus you’ll likely need to get sensible results. While the concepts discussed thus far might seem pretty abstract, they are easier to understand once you start looking at specific examples.
+
+Let’s now turn to a specific corpus and start running some code to train and query a word2vec model.
+
+# Practice: Exploring Nineteenth-Century American Recipes
+
+The corpus we are using in this lesson is built from nineteenth-century American recipes. Nineteenth-century people thought about food differently than we do today. Before modern technology like the refrigerator and the coal stove became widespread, cooks had to think about preserving ingredients or accommodating the uneven temperatures of wood-burning stoves.
+
+Without the modern conveniences of instant cake mixes, microwaves, and electric refrigerators, nineteenth-century kitchens were much less equipped to handle food that could quickly go bad. As a result, many nineteenth-century cookbooks prioritize thriftiness and low-waste methods, though sections dedicated to more elaborate cooking increase substantially by the turn of the century.
+
+Word embedding models allow us to pursue questions such as:
+
+What does American cooking look like if you remove the more elaborate dishes like *cake*, or low-waste techniques like *preserves*?
+
+Our research question for this lesson is:
+
+**How does the language of our corpus reflect attitudes towards recreational cooking and the limited lifespan of perishable ingredients (such as milk) in the nineteenth century?**
+
+Since we know milk was difficult to preserve, we can check what words are used in similar contexts to *milk* to see if that reveals potential substitutions. Using vector space model queries, we will retrieve a list of words which do not include *milk* but do share its contexts.
+
+Similarly, by finding words which share contexts with dishes like *cake*, we can see how authors talk about cake and find dishes that are talked about in a similar way.
+
+------------------------------------------------------------------------
+
+# Retrieving the Data
+
+The corpus used in this tutorial consists of a collection of recipe texts stored as `.txt` files.
+
+You can download the dataset here:
+
+[Download the recipe corpus](https://github.com/DCS-training/Understanding-Creating-WordEmbeddings/raw/main/data/recipes.zip)
+
+The recipe corpus is provided as a compressed `.zip` file. Clicking the link above will automatically download `recipes.zip`.
+
+Once the download is complete:
+
+1.  Locate `recipes.zip` in your **Downloads** folder.
+2.  Extract the archive.
+3.  Move the extracted `recipes` folder into the `data` folder inside the workshop repository.
+
+After doing this, your project folder should look like this:
+
+```         
+word_embeddings_workshop/
+│
+├── word_embeddings.Rmd
+│
+├── data/
+│   └── recipes/
+│       recipe_1.txt
+│       recipe_2.txt
+│       recipe_3.txt
+│       ...
+```
+
+# Loading the Corpus
+
+Now that the data has been placed in the correct folder, we can load the recipe texts into R.
+
+First, we define the path to the folder containing the `.txt` files.
+
+```{r}
+dirpath <- "data/recipes"
+```
+
+Next, we list the files contained in that folder.
+
+```{r}
+filenames <- list.files(dirpath, pattern = "*.txt", full.names = TRUE)
+
+length(filenames)
+```
+
+This command returns the number of recipe files in the corpus.
+
+Each file contains the text of one recipe. We now read these files into R.
+
+```{r}
+data <- map_chr(filenames, read_file)
+
+length(data)
+```
+
+The object **data** now contains the text of each recipe in the corpus.
+
+Each element of the list corresponds to one recipe.
+
+We can inspect the first recipe to see what the text looks like:
+
+```{r}
+data[[1]]
+```
+
+Depending on the recipe, the text may contain punctuation, capital letters, or other formatting. Before training a word embedding model, we will need to clean and standardize the text so that words are treated consistently.
+
+# Building your Model’s Vocabulary
+
+Using textual data to train a model builds what is called a *vocabulary*. The vocabulary is all of the words that the model has processed during training. This means that the model knows only the words it has been shown. If your data includes misspellings or inconsistencies in capitalization, the model won’t understand that these are mistakes. Think of the model as having complete trust in you: the model will believe any misspelled words to be correct. Errors will make asking the model questions about its vocabulary difficult: the model has less data about how each spelling is used, and any query you make will only account for the unique spelling used in that query.
+
+It might seem, then, that regularizing the text’s misspellings is always helpful, but that’s not necessarily the case. Decisions about regularization should take into account how spelling variations operate in the corpus, and should consider how original spellings and word usages could affect the model’s interpretations of the corpus. For example, a collection might contain deliberate archaisms used for poetic voice, which would be flattened in the regularized text. In fact, some researchers advocate for more embracing of textual noise, and a project interested in spelling variations over time would certainly want to keep those.
+
+Nevertheless, regularization is worth considering, particularly for research projects exploring language usage over time: it might not be important whether the spelling is *queen*, *quean*, or *queene* for a project studying discourse around queenship within a broad chronological frame. As with many aspects of working with word embeddings, the right approach is whatever best matches your corpus and research goals.
+
+Regardless of your approach, it is generally useful to lowercase all of the words in the corpus and remove most punctuation. You can also make decisions about how to handle contractions (can’t) and commonly occurring word-pairings (olive oil), which can be tokenized to be treated as either one or two objects.
+
+Different tokenization modules will have different options for handling contractions, so you can choose a module that allows you to preprocess your texts to best match your corpus and research needs.
+
+# Cleaning the Corpus
+
+The code we include in this lesson is a reasonable general-purpose starting point for “cleaning” English-language texts. The function `clean_text()` uses regular expressions to standardize the format of the text (for example, converting everything to lowercase) and removes punctuation that may interfere with the model’s understanding of the text.
+
+If desired, you could modify the regular expression used below to retain certain punctuation marks. For example, some projects may want to preserve apostrophes or hyphenated words. As with many preprocessing steps, the correct approach depends on your corpus and research goals.
+
+This process helps the model understand, for example, that *apple* and *Apple* refer to the same word. It also removes numbers from the text, since we are interested only in words. Finally, the text is split into tokens so that each word becomes a separate element.
+
+```{r}
+
+# Define a function that cleans a single text
+clean_text <- function(text) {
+
+  # Split the text into individual tokens (words)
+  # "\\s+" means "one or more whitespace characters"
+  tokens <- str_split(text, "\\s+")[[1]]
+
+  # Convert all tokens to lowercase
+  # This ensures that words like "Milk" and "milk" are treated as the same word
+  tokens <- str_to_lower(tokens)
+
+  # Remove punctuation characters
+  # For example: commas, periods, quotation marks, etc.
+  tokens <- str_replace_all(tokens, "[[:punct:]]", "")
+
+  # Remove tokens that contain numbers or other non-alphabetic characters
+  # This keeps only tokens consisting entirely of letters
+  tokens <- tokens[str_detect(tokens, "^[a-z]+$")]
+
+  # Return the cleaned tokens
+  return(tokens)
+}
+
+# Apply the cleaning function to every recipe in the corpus
+# Each element of `data` is a recipe text
+# The result will be a list where each element is a vector of cleaned tokens
+data_clean <- map(data, clean_text)
+```
+
+Lets see what has changed after cleaning the data:
+
+```{r}
+# Look at the first few tokens before cleaning
+str_split(data[[1]], "\\s+")[[1]][1:20]
+
+# Look at the first few tokens after cleaning
+data_clean[[1]][1:20]
+```
+
+# Creating your Model
+
+To train a word2vec model, the code first extracts the corpus vocabulary and generates from it a random set of initial word vectors. Then, it improves their predictive power by changing their weights, based on sampling contexts (where the word exists) and negative contexts (where the word doesn’t exist).
+
+## Parameters
+
+In addition to the corpus selection and cleaning described above, at certain points in the process you can decide to adjust what are known as configuration *parameters*. These are almost as essential as the texts you select for your corpus. You can think of the training process (where we take a corpus and create a model from it) as being sort of like an industrial operation:
+
+-   You take raw materials and feed them into a big machine which outputs a product on the other end\
+-   This hypothetical machine has a whole bunch of knobs and levers on it that you use to control the settings (the parameters)\
+-   Depending on how you adjust the parameters, you get back different products (differently trained models)
+
+These parameters have a significant impact on the models you produce. They control things such as which algorithm is used in training, how to handle rare words in your corpus, and how many times the algorithm should pass through the corpus as it learns.
+
+There is no “one size fits all” configuration approach. The most effective parameters will depend on the length of your texts, the variety of the vocabulary within those texts, their language and structure — and, of course, the kinds of questions you want to investigate.
+
+Part of working with word vector models is turning the knobs on that metaphorical industrial machine, testing how different parameters impact your results. It is usually best to vary parameters one at a time so that you can observe how each one changes the resulting model.
+
+Because word2vec samples the data before training, you will not necessarily get the same result every time. It may therefore be useful to run the model multiple times to confirm that the results you observe are stable.
+
+Below are several parameters that are particularly important.
+
+### Sentences
+
+The `sentences` parameter tells the model what data to train on. In our case, we will use the cleaned textual data stored in `data_clean`.
+
+### min_count
+
+`min_count` specifies how many times a word must appear in the corpus to be included in the vocabulary. Words that appear very rarely often do not have enough contextual information to produce meaningful embeddings.
+
+### window
+
+The `window` parameter defines how many surrounding words are considered part of the context when training the model. A window size of 5 means the algorithm considers words within five positions of the target word.
+
+### epochs
+
+`epochs` determines how many times the algorithm passes over the corpus during training. More epochs allow the model to learn more thoroughly, though too many can lead to overfitting.
+
+### vector_size
+
+This parameter determines the dimensionality of the word vectors. Larger dimensions allow more complex relationships to be represented but increase computational cost.
+
+------------------------------------------------------------------------
+
+The code below shows how a word embedding model can be trained in R using the `text2vec` package.
+
+In this tutorial we **will not run this code**. Training a model can take several minutes depending on the size of the corpus and the speed of the computer being used. Because workshop participants may have different machines, running the training step could slow the session down.
+
+Instead, we include the code so that you can see **how the model would normally be created**. In the next section we will load a **pre-trained model** that was created using this same procedure.
+
+The training process involves several steps:
+
+1.  Creating an iterator over the tokenized texts.
+2.  Building a vocabulary from the corpus.
+3.  Constructing a term co-occurrence matrix, which records how often words appear near each other.
+4.  Training the embedding model using this matrix.
+
+```{r eval=FALSE}
+library(text2vec)
+
+# create iterator over tokenized texts
+tokens <- itoken(data_clean, progressbar = FALSE)
+
+# build vocabulary
+vocab <- create_vocabulary(tokens)
+
+# create vectorizer
+vectorizer <- vocab_vectorizer(vocab)
+
+# build term co-occurrence matrix
+tcm <- create_tcm(tokens, vectorizer, skip_grams_window = 5)
+
+# train GloVe embeddings
+glove <- GlobalVectors$new(rank = 100, x_max = 10)
+
+word_vectors <- glove$fit_transform(tcm, n_iter = 5)
+
+# save the trained model
+saveRDS(word_vectors, "models/recipe_embeddings.rds")
+```
+
+# Loading the Pre-Trained Model
+
+Instead of training the model ourselves, we will load a version that has already been trained on the recipe corpus.
+The trained model is stored in the folder models/recipe_embeddings.rds. 
+The file `recipe_embeddings.rds` contains the word vectors produced during the training process. Each word in the vocabulary is represented by a vector of numbers that captures how that word is used in relation to other words in the corpus.
+
+We can load this model using the `readRDS()` function.
+
+```{r}
+word_vectors <- readRDS("models/recipe_embeddings.rds")
+```
+
+The object word_vectors now contains the trained word embeddings.
+
+Each row corresponds to a word in the vocabulary, and each column represents one dimension of the embedding space.
+
+We can inspect the structure of the embeddings. This tells us how many words are represented in the vocabulary and how many dimensions each word vector has:
+
+```{r}
+dim(word_vectors)
+```
+
+The output shows that the model contains vectors for 4608 words, and each word is represented using a 100-dimensional vector.
+
+We can also look at a small portion of the matrix:
+
+```{r}
+word_vectors[1:5, 1:5]
+```
+
+This displays the first few words and the first few dimensions of their vectors.
+
+Although these numbers may not look meaningful on their own, they encode relationships between words.
+
+# Interrogating the Model with Exploratory Queries
+
+It is important to begin by checking that the word we want to examine is actually part of our model’s vocabulary.
+
+In our implementation, the embeddings are stored as a matrix where the **row names correspond to the words in the vocabulary**. We can therefore check whether a word exists by testing whether it appears among the row names.
+
+```{r}
+word <- "milk"
+
+if (word %in% rownames(word_vectors)) {
+  cat("The word", word, "is in your model vocabulary\n")
+} else {
+  cat(word, "is not in your model vocabulary\n")
+}
+```
+
+Now we can begin asking the model questions about the relationships between words.
+
+One important thing to remember is that the results returned by these functions do **not necessarily reflect words that have similar dictionary definitions**. Instead, they reflect words that are **used in similar contexts** in the corpus. Sometimes this means that the model will return surprising results. When this happens, it can be helpful to return to the corpus and examine how the language is actually used in the texts.
+
+------------------------------------------------------------------------
+
+## Finding Similar Words
+
+A common way to explore embeddings is to retrieve words that are used in similar contexts to a chosen word.
+
+To do this we calculate **cosine similarity** between word vectors. The higher the cosine similarity, the closer the words are in vector space.
+
+First we define a helper function that returns the most similar words to a query term.
+
+```{r}
+library(text2vec)
+
+most_similar <- function(word, embeddings, top_n = 10) {
+  
+  if (!(word %in% rownames(embeddings))) {
+    stop("Word not in vocabulary")
+  }
+
+  similarities <- sim2(
+    x = embeddings[word, , drop = FALSE],
+    y = embeddings,
+    method = "cosine",
+    norm = "l2"
+  )
+
+  similarities <- sort(similarities[1, ], decreasing = TRUE)
+
+  head(similarities[-1], top_n)
+}
+```
+
+We can now retrieve the ten words that are most similar to **milk**.
+
+```{r}
+most_similar("milk", word_vectors, top_n = 10)
+```
+
+The output lists the words that appear in contexts most similar to the word *milk* in our corpus.
+
+------------------------------------------------------------------------
+
+## Combining Words in Queries
+
+We can also ask more specific questions by combining words.
+
+For example, we might want words that are similar to **recipe**, but not similar to **milk**.
+
+```{r}
+query_vector <- word_vectors["recipe", ] - word_vectors["milk", ]
+
+similarities <- sim2(
+  matrix(query_vector, nrow = 1),
+  word_vectors,
+  method = "cosine",
+  norm = "l2"
+)
+
+sort(similarities[1, ], decreasing = TRUE)[1:10]
+```
+
+We can also combine multiple words to form a query.
+
+For example, we might look for words related to both **recipe** and **milk**.
+
+```{r}
+query_vector <- word_vectors["recipe", ] + word_vectors["milk", ]
+
+similarities <- sim2(
+  matrix(query_vector, nrow = 1),
+  word_vectors,
+  method = "cosine",
+  norm = "l2"
+)
+
+sort(similarities[1, ], decreasing = TRUE)[1:10]
+```
+
+These types of operations allow us to explore how different concepts relate to each other in the corpus.
+
+------------------------------------------------------------------------
+
+## Calculating Similarity Between Two Words
+
+We can also calculate the cosine similarity between two words directly.
+
+```{r}
+sim2(
+  word_vectors["milk", , drop = FALSE],
+  word_vectors["cream", , drop = FALSE],
+  method = "cosine",
+  norm = "l2"
+)
+```
+
+The higher the cosine similarity score, the more similar the contexts in which the two words appear.
+
+------------------------------------------------------------------------
+
+# Interpreting the Results
+
+It is important to remember that word embeddings capture **contextual similarity rather than dictionary meaning**.
+
+Words that appear close together in vector space may be:
+
+-   synonyms\
+-   antonyms\
+-   ingredients used in similar recipes\
+-   tools used in similar cooking contexts
+
+When a model returns unexpected results, it is often useful to return to the corpus and examine how the words are actually used in the texts.
+
+# Validating the Model
+
+Now that we have explored some of the model’s functions, it is useful to perform a simple check of how the model behaves. Does it respond to our queries in ways we would broadly expect? Does it produce obviously implausible results?
+
+Evaluating word embedding models is not straightforward, especially when working with historical or domain-specific corpora. Unlike many machine learning tasks, there is no single correct answer that we can easily compare our model against. For this reason, researchers often use simple heuristic tests to get a general sense of whether the model is capturing meaningful relationships.
+
+One common approach is to test **pairs of words that we expect to appear in similar contexts**. In our case, the corpus consists of nineteenth-century recipes, so we can choose word pairs that are commonly associated with cooking.
+
+For example:
+
+-   *stir* and *whisk* are both cooking actions\
+-   *cream* and *milk* are both dairy ingredients\
+-   *cake* and *muffin* are both baked goods
+
+If the model has learned useful patterns from the corpus, these word pairs should tend to have **higher cosine similarity scores** than unrelated words.
+
+Below we create a small list of such word pairs and calculate their cosine similarities.
+
+```{r}
+test_pairs <- list(
+  c("stir", "whisk"),
+  c("cream", "milk"),
+  c("cake", "muffin"),
+  c("jam", "jelly"),
+  c("bake", "cook")
+)
+```
+
+Next, we calculate the cosine similarity for each pair.
+
+```{r}
+for (pair in test_pairs) {
+
+  word1 <- pair[1]
+  word2 <- pair[2]
+
+  if (word1 %in% rownames(word_vectors) && word2 %in% rownames(word_vectors)) {
+
+    similarity <- sim2(
+      word_vectors[word1, , drop = FALSE],
+      word_vectors[word2, , drop = FALSE],
+      method = "cosine",
+      norm = "l2"
+    )
+
+    cat(word1, "-", word2, ":", similarity, "\n")
+
+  } else {
+
+    cat("One of the words in the pair", word1, "-", word2, "is not in the vocabulary\n")
+
+  }
+}
+```
+
+The output shows the cosine similarity score for each pair of words. Higher scores indicate that the words tend to appear in similar contexts in the corpus.
+
+It is important to note that this type of test does **not provide a definitive evaluation of the model**. Instead, it offers a rough indication of whether the embeddings capture some expected relationships in the data.
+
+The similarity scores may not always match our intuitive expectations. Word embeddings measure **contextual similarity rather than dictionary meaning**.
+
+For example, words such as *stir* and *whisk* may appear in different types of instructions within recipes, leading the model to treat them as less similar. Likewise, *cake* and *muffin* may occur with different surrounding words such as *pan*, *tin*, or *batter*.
+
+If words that we expect to be related have low similarity scores, it can be useful to return to the corpus and examine how those words are actually used. Low similarity may simply reflect that:
+
+-   the words do not appear frequently enough in the corpus\
+-   they appear in different contexts\
+-   the corpus is too small for the model to learn stable relationships
+
+In practice, evaluating word embedding models often requires combining several approaches and carefully interpreting the results in relation to the corpus itself.
+
+# Final Remarks
+
+## Application: Building a Corpus for your own Research
+
+Now that you have had a chance to explore training and querying a model using a sample corpus, you might consider how word embeddings could be applied to your own research.
+
+When deciding whether word vectors could be useful for your project, it is important to consider whether the kinds of questions you want to investigate can be answered by analyzing patterns of word usage across a large corpus.
+
+For example, if you were studying how early modern British historians distinguished their work from that of medieval writers, you might assemble two corpora: one containing medieval historical texts and another containing early modern histories. You could then examine how certain concepts or terms are used differently across these corpora.
+
+More generally, it is useful to ask whether **relationships between words** are a meaningful way to approach your research question. Can you identify terms or groups of terms that represent the conceptual areas you want to study?
+
+Another important consideration when building a corpus is the **composition of the texts** you include. You may want to think about questions such as:
+
+-   Are the texts written in a single language, or multiple languages?
+-   Do the texts vary significantly in genre, form, or length?
+-   Are they drawn from different historical periods or publication contexts?
+
+For example, if you mix documents written in different languages, the model will not automatically link equivalent words across languages. The contexts of the Spanish word *gato* will not automatically merge with the contexts of the English word *cat*. If your corpus contains multiple languages, this should be done deliberately and with a clear research goal.
+
+You should also think carefully about how you define the scope of your corpus. Possible criteria include:
+
+-   publication date\
+-   author\
+-   publisher\
+-   geographic location\
+-   genre or document type
+
+Whatever criteria you choose, it is important that they align with the research question you want to investigate.
+
+If you are not including every possible text within your defined scope—which is often the case—you should also consider whether the texts you select are broadly representative. For example, if a corpus of seventeenth-century histories contained nearly all texts from the year 1699 and only one from 1601, the results might be misleading.
+
+In general, you should aim for a corpus that is balanced in the features that matter for your research question. Word embeddings capture relationships between words, so the **choice of texts included in the corpus is crucial**.
+
+------------------------------------------------------------------------
+
+## Preparing the Texts in your Corpus
+
+When preparing a corpus, remember that the model is trained on all the words present in your texts. Because the results depend so heavily on the input data, it is important to examine your corpus carefully before training a model.
+
+Data preparation is often an **iterative process**. You may begin by reviewing the texts, identifying features that should be removed or standardized, modifying the texts, and then reviewing the results again.
+
+For example, if you obtain texts from sources such as Project Gutenberg, you may need to remove boilerplate text that appears at the beginning or end of the files. Other elements that researchers often remove include:
+
+-   page numbers\
+-   editorial notes or annotations\
+-   captions or image descriptions\
+-   document labels or headers
+
+These elements may not be relevant to your research question and could distort the relationships between words.
+
+The goals of your project will determine which features should be kept or removed. Some projects may retain paratextual elements such as indices or tables of contents, while others may remove them. In some cases, researchers also modify the language of the texts—for example by standardizing spelling, correcting errors, or lemmatizing words.
+
+If you choose to alter the language of your texts, it is good practice to also keep an **unaltered version of the corpus**. This allows you to compare results and understand how data preparation decisions influence the model.
+
+Once your corpus has been assembled and prepared, you can adapt the code from this tutorial to train, query, and evaluate your own models. As you work with your data, you will likely refine both your corpus and your model parameters.
+
+------------------------------------------------------------------------
+
+## Next Steps
+
+This tutorial has introduced the basic workflow for training and exploring word embeddings using a small sample corpus. In practice, researchers often work with larger datasets and experiment with different model parameters to better understand the patterns present in their texts.
+
+If you would like to explore word embeddings further, you might consider:
+
+-   experimenting with larger or different corpora\
+-   comparing models trained on different time periods\
+-   examining how particular concepts change across texts
+
+There are also many advanced methods that build on word embeddings, such as clustering, document similarity analysis, and visualization techniques.
+
+The more you experiment with these models and your textual data, the better you will understand how word embeddings can help reveal patterns of language use in large corpora.
+
+# Acknowledgements
+
+This R tutorial is adapted from the Programming Historian lesson *Understanding and Creating Word Embeddings* by Mark Algee-Hewitt, Sarah Allison, Marissa Gemma, Ryan Heuser, and Hannah Walser.
+
+The original tutorial is available at: <https://programminghistorian.org/en/lessons/understanding-and-creating-word-embeddings>
