@@ -183,3 +183,8 @@ The repository is organised as follows:
 
 ---
 
+# Getting started with Python with simpler setup procedures
+
+The linked [Programming Historian](https://programminghistorian.org/en/lessons/understanding-creating-word-embeddings#corpus-size) tutorial has some important setup requisites for working locally on your PC. Depending on your experience with Python this could become a hassle, therefore for those who would like to follow the tutorial using the University [Noteable](https://noteable.edina.ac.uk/launch) cloud service, we have added core materials from the tutorial to this repository so it can be cloned with a file structure and important installs pre-embedded.
+
+To follow the Noteable setup procedure please click [HERE](https://github.com/DCS-training/Understanding-Creating-WordEmbeddings/blob/main/SetupGuide_Python_Details_README.md)
