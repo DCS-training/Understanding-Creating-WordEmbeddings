@@ -1,5 +1,5 @@
 # Understanding and Creating Word Embeddings
-This repository contains the materials for the **Silent Disco: Understanding and Creating Word Embeddings** workshop.
+This repository contains the materials for the **Silent Disco: Understanding and Creating Word Embeddings** workshop, developed by Dr. Aybuke Atalay.
 
 The tutorial introduces the basic concepts behind **word embeddings** and demonstrates how they can be explored using computational methods.
 
