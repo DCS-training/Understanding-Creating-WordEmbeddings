@@ -92,7 +92,7 @@ The tutorial also includes the training code so that participants can see how su
 ---
 # Getting Started in Python
 
-T### Setting up for the word embedding tutorial in python
+### Setting up for the word embedding tutorial in python
 
 - The self guided tutorial is fully encompassed in the html link sent to you and it has some setup instructions requiring you to install some tools and have some pre-knowledge of working with Python locally on your PC. 
 - Depending on whether you are a newcomer to programming or intermediate, you may or may not have an existing local setup suitable for working through the tutorial. 
@@ -124,7 +124,7 @@ One everything is cloned onto Noteable. You can start by clicking on the python 
 NOTE: the original authors of the tutorial are listed in the DOI link above, here we have simply added some small setup blocks for ease of access to run the tutorial on University cloud systems. The original codebook was downloaded from [here](https://nbviewer.org/github/programminghistorian/jekyll/blob/gh-pages/assets/understanding-creating-word-embeddings/understanding-creating-word-embeddings.ipynb) and the text corpora folder with data was downloaded from [here](https://programminghistorian.org/assets/understanding-creating-word-embeddings/ViralTexts-nineteenth-century-recipes-plaintext.zip)
 
 
-#### Alternate option
+#### Alternative Set-Up 
 
 - Google Colab is a similar working space to the above option.
 
